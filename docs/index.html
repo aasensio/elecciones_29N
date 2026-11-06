@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elecciones 29-N: agregador de encuestas</title>
+<meta name="description" content="Modelo bayesiano que agrega las encuestas de las elecciones generales del 29 de noviembre de 2026: estimación de voto, simulación de escaños, pactómetro y sesgos de las casas encuestadoras.">
+<meta property="og:title" content="Elecciones 29-N: agregador de encuestas">
+<meta property="og:description" content="Estimación de voto y escaños con un modelo bayesiano que corrige los sesgos de cada casa encuestadora.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 26a13 13 0 0 1 26 0' fill='none' stroke='%231f63c4' stroke-width='5'/%3E%3Cpath d='M10 26a6 6 0 0 1 12 0' fill='none' stroke='%23c8202e' stroke-width='5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=2026-11-06">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script>try{var t=localStorage.getItem('tema');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#resultados"><span class="brand-mark" aria-hidden="true"></span>29-N</a>
+    <div class="tabs" role="tablist" aria-label="Secciones">
+      <span class="tab-ind" aria-hidden="true"></span>
+      <button role="tab" id="t-res" aria-controls="resultados" aria-selected="true">Resultados</button>
+      <button role="tab" id="t-mod" aria-controls="modelo" aria-selected="false" tabindex="-1">El modelo</button>
+    </div>
+    <button class="theme" id="theme" aria-label="Cambiar entre tema claro y oscuro" title="Cambiar tema">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 0 18V3Z"/><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+<!-- ============================== RESULTADOS ============================== -->
+<section id="resultados" role="tabpanel" aria-labelledby="t-res">
+  <div class="hero wrap">
+    <p class="kicker"><span id="countdown"></span></p>
+    <h1>Elecciones generales<br>del 29 de noviembre</h1>
+    <p class="lede" id="lede"></p>
+    <p class="facts" id="facts"></p>
+  </div>
+
+  <div class="wrap hemi-grid">
+    <figure class="hemi-fig">
+      <div class="hemi-box">
+        <svg id="hemi" viewBox="0 0 800 420" role="img" aria-label="Hemiciclo de 350 escaños con el reparto estimado"></svg>
+        <div class="hemi-center">
+          <strong id="hemi-n">350</strong>
+          <span id="hemi-cap">reparto típico</span>
+        </div>
+      </div>
+      <div class="hemi-controls">
+        <button class="btn" id="hemi-play"><span class="ico">▶</span> <span>Simular elecciones</span></button>
+        <button class="btn ghost" id="hemi-reset">Reparto típico</button>
+      </div>
+      <div class="legend" id="hemi-legend"></div>
+    </figure>
+    <div class="tiles" id="tiles"></div>
+  </div>
+
+  <div class="wrap">
+    <aside class="caveat">
+      <strong>Cómo leer las cifras.</strong> Los intervalos son <em>creíbles al 90 %</em> y recogen lo que las encuestas permiten saber a día de hoy.
+      No incluyen un error propio del día de la votación ni la dinámica de campaña, así que la incertidumbre real es mayor que la mostrada.
+      Por eso las probabilidades extremas se muestran como «&gt;99 %» o «&lt;1 %». <a href="#modelo" data-go="limites">Ver las limitaciones</a>.
+    </aside>
+  </div>
+
+  <article class="wrap block">
+    <header class="bh"><span class="num">01</span><div>
+      <h2>Estimación de voto el 29-N</h2>
+      <p>Distribución a posteriori del porcentaje de voto válido de cada candidatura, ya corregidos los sesgos de las casas.</p>
+    </div></header>
+    <div id="vote" class="chart"></div>
+    <p class="note" id="vote-note"></p>
+    <details class="data"><summary>Ver la tabla de datos</summary><div class="tw" id="vote-table"></div></details>
+  </article>
+
+  <article class="wrap block">
+    <header class="bh"><span class="num">02</span><div>
+      <h2>Tres años de intención de voto</h2>
+      <p>Estimación quincenal desde el 23-J. La línea es la mediana, la banda el intervalo del 90 % y cada punto una encuesta sin corregir.</p>
+    </div></header>
+    <div class="controls">
+      <div class="chips" id="evo-chips" aria-label="Partidos mostrados"></div>
+      <div class="ctl-right">
+        <div class="seg" id="evo-range" role="group" aria-label="Periodo">
+          <button data-r="all" class="on">Todo</button><button data-r="12">12 meses</button><button data-r="4">4 meses</button>
+        </div>
+        <label class="check"><input type="checkbox" id="evo-polls" checked> Encuestas</label>
+        <button class="btn sm" id="evo-play"><span class="ico">▶</span> Reproducir</button>
+      </div>
+    </div>
+    <div id="evo" class="chart evo"></div>
+    <p class="note" id="evo-note"></p>
+
+    <h3 class="sub">Partidos territoriales y de ámbito limitado</h3>
+    <p class="subp">Todos los paneles usan la misma escala. Son porcentajes sobre el voto nacional.</p>
+    <div id="smalls" class="smalls"></div>
+  </article>
+
+  <article class="wrap block">
+    <header class="bh"><span class="num">03</span><div>
+      <h2>Escaños por candidatura</h2>
+      <p id="seats-sub"></p>
+    </div></header>
+    <div id="seats" class="chart"></div>
+    <p class="note" id="seats-note"></p>
+    <details class="data"><summary>Ver la tabla de datos</summary><div class="tw" id="seats-table"></div></details>
+  </article>
+
+  <article class="wrap block">
+    <header class="bh"><span class="num">04</span><div>
+      <h2>Pactómetro</h2>
+      <p>Elige candidaturas y mira con qué frecuencia su suma alcanza los 176 escaños en las simulaciones. Es aritmética, no una previsión de pactos.</p>
+    </div></header>
+    <div class="pact">
+      <div class="pact-l">
+        <div class="seg wrapseg" id="pact-presets" role="group" aria-label="Sumas predefinidas"></div>
+        <div class="chips" id="pact-chips"></div>
+      </div>
+      <div class="pact-r">
+        <div class="pact-big"><strong id="pact-p">–</strong><span>de alcanzar 176 escaños</span></div>
+        <div class="pact-sub" id="pact-sub"></div>
+      </div>
+    </div>
+    <div id="pact-bar" class="pact-bar"></div>
+    <div id="pact-hist" class="chart"></div>
+  </article>
+
+  <article class="wrap block">
+    <header class="bh"><span class="num">05</span><div>
+      <h2>Provincia a provincia</h2>
+      <p>Reparto más repetido en cada circunscripción. El porcentaje indica cuántas simulaciones dan exactamente ese reparto: cuanto más bajo, más abierta está la provincia.</p>
+    </div></header>
+    <div class="controls">
+      <div class="seg" id="prov-sort" role="group" aria-label="Orden">
+        <button data-s="seats" class="on">Más escaños</button><button data-s="open">Más abiertas</button><button data-s="az">A–Z</button>
+      </div>
+      <label class="select">Comunidad <select id="prov-ccaa"></select></label>
+    </div>
+    <div id="provs" class="provs"></div>
+    <p class="note">Los perfiles provinciales salen de un swing proporcional sobre 2023 con ruido provincial y regional supuesto, no estimado. Los candidatos nuevos (SALF, Adelante Andalucía, Aliança Catalana) reparten su voto de forma uniforme dentro de su territorio, así que este es el resultado menos sólido de la web.</p>
+  </article>
+
+  <article class="wrap block">
+    <header class="bh"><span class="num">06</span><div>
+      <h2>Sesgos de las casas encuestadoras</h2>
+      <p>Cuántos puntos se desvía cada casa de la estimación del modelo, a igualdad de fecha. A la derecha del cero, la casa da más voto del estimado.</p>
+    </div></header>
+    <div class="controls"><div class="seg" id="house-party" role="group" aria-label="Partido"></div></div>
+    <div id="houses" class="chart"></div>
+    <p class="note" id="house-note"></p>
+    <details class="data"><summary>Ver la tabla de datos, con el ruido de cada casa</summary><div class="tw" id="house-table"></div></details>
+  </article>
+</section>
+
+<!-- ============================== EL MODELO ============================== -->
+<section id="modelo" role="tabpanel" aria-labelledby="t-mod" hidden>
+  <div class="hero wrap sm">
+    <p class="kicker">Cómo funciona</p>
+    <h1>Un modelo que lee encuestas<br>con desconfianza</h1>
+    <p class="lede">Ninguna encuesta se toma al pie de la letra. El modelo supone que existe una intención de voto real que no se observa y que cambia despacio, y que cada encuesta es una medida ruidosa y sesgada de ella. A partir de ahí, deduce a la vez la intención de voto, el sesgo de cada casa y su fiabilidad.</p>
+  </div>
+
+  <div class="wrap prose">
+    <ol class="flow">
+      <li><b>Encuestas</b><span id="flow-polls"></span></li>
+      <li><b>Corrección</b><span>sesgo y ruido propios de cada casa</span></li>
+      <li><b>Voto latente</b><span>paseo aleatorio quincenal de 16 componentes</span></li>
+      <li><b>Candidaturas</b><span>coaliciones de 2026 por territorio</span></li>
+      <li><b>Escaños</b><span id="flow-seats"></span></li>
+    </ol>
+
+    <h2>1. La intención de voto latente</h2>
+    <p>El estado del modelo son los <em>logits</em> \(\eta_t\) de 16 componentes estables: PP, PSOE, Vox, S (el espacio Sumar sin Podemos), Podemos, SALF, Otros y nueve partidos territoriales. Cada quincena se mueven un poco respecto a la anterior:</p>
+    <div class="eq">\[\eta_t = \eta_{t-1} + \operatorname{diag}(\sigma)\,L\,z_t,\qquad z_t\sim\mathcal N(0,I),\qquad \theta_t=\operatorname{softmax}(\eta_t)\]</div>
+    <p>La matriz \(L\) correlaciona los siete componentes estatales con un prior LKJ: permite que, por ejemplo, Vox suba cuando baja el PP. Los territoriales evolucionan de forma independiente. Gracias a este paseo aleatorio, las quincenas con pocas encuestas toman información de las vecinas, y la incertidumbre crece de forma natural entre la última encuesta y el día de la votación.</p>
+    <p>El resultado del 23-J entra como una observación casi exacta, sin sesgo de casa. Es el <strong>ancla</strong> que fija el nivel de partida de toda la serie.</p>
+
+    <h2>2. De componentes a candidaturas</h2>
+    <p>El panorama ha cambiado desde 2023: Sumar se rompió, Podemos fue por libre, apareció SALF y en otoño de 2026 se cerraron nuevas coaliciones. Las encuestas publican columnas distintas según la fecha. El modelo no reescribe esas series: cada encuesta \(p\) observa una <em>agregación</em> de los componentes estables,</p>
+    <div class="eq">\[\pi^{\text{cand}}_p = \big(A^0_p + \rho\,A^\rho_p\big)\,\operatorname{softmax}\big(\eta_{t(p)} + \delta_{h(p)}\big)\]</div>
+    <p>La matriz \(A_p\) depende de la fecha y de lo que publica cada encuesta. Lo no publicado va a una categoría «resto» con su peso exacto. El parámetro \(\rho\) es el peso de Compromís dentro del espacio Sumar, que solo se observa por separado en las encuestas de octubre de 2026.</p>
+    <div class="tw"><table class="plain">
+      <thead><tr><th>Columna publicada</th><th>Cuándo</th><th>Qué mide en el modelo</th></tr></thead>
+      <tbody>
+        <tr><td>Sumar</td><td>Antes de abril de 2024, sin Podemos aparte</td><td>S + Podemos (la coalición de 2023)</td></tr>
+        <tr><td>Sumar</td><td>Después</td><td>S</td></tr>
+        <tr><td>Frente Amplio</td><td>2026</td><td>\((1-\rho)\,S\), o \(S\) si la encuesta incluye a Compromís</td></tr>
+        <tr><td>Compromís-FV</td><td>2026</td><td>\(\rho\,S\), más la parte de Podemos en C. Valenciana desde el 13-O</td></tr>
+        <tr><td>Podemos</td><td>Desde el 13-O de 2026</td><td id="tbl-podemos"></td></tr>
+        <tr><td>ERC</td><td>Desde el 13-O de 2026</td><td>ERC más la parte de Podemos en Cataluña</td></tr>
+        <tr><td>SALF</td><td>Desde junio de 2024</td><td>SALF. Antes no existe (máscara de nacimiento)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2>3. Los sesgos de las casas</h2>
+    <p>Cada casa \(h\) tiene un sesgo constante por componente, en escala logit. Se divide en lo que comparte toda la industria y lo propio de la casa:</p>
+    <div class="eq">\[\delta_{h} = \mu\cdot\text{anclado} + \tau\odot\big(z_h-\bar z\big)\]</div>
+    <p>La media \(\bar z\) se calcula solo entre las casas que publican cada componente. El sesgo común \(\mu\) solo se estima donde hay un resultado electoral previo: para SALF, Adelante Andalucía y Aliança Catalana se fija en cero, porque nada permite distinguir si todas las casas se equivocan a la vez. Es la razón de que su estimación sea especialmente frágil.</p>
+
+    <h2>4. La verosimilitud</h2>
+    <p>Las encuestas siguen una Dirichlet-multinomial, que añade a la multinomial una sobredispersión \(\phi_h\) propia de cada casa:</p>
+    <div class="eq">\[y_p \sim \text{DirMult}\big(n_p,\ \phi_{h(p)}\,\pi^{\text{cand}}_p\big)\]</div>
+    <p id="lik-text"></p>
+
+    <h2>5. Del voto a los escaños</h2>
+    <p>Cada simulación toma una muestra del voto nacional y la convierte en 350 escaños:</p>
+    <ol class="steps">
+      <li><b>Swing proporcional.</b> Cada partido multiplica sus porcentajes provinciales de 2023 por su variación nacional. El voto de Sumar en 2023 se reparte entre sus componentes.</li>
+      <li><b>Ruido.</b> Se añade ruido provincial (0,10 en escala logarítmica) y regional (0,07). Estas dos escalas son supuestos, no parámetros estimados.</li>
+      <li><b>Calibración.</b> Un ajuste iterativo (IPF) hace que las provincias vuelvan a sumar el voto nacional simulado.</li>
+      <li><b>Candidaturas 2026.</b> Compromís-FV con Podemos en la C. Valenciana, ERC con Podemos en Cataluña y UPC (FA, Podemos y NC) en Canarias.</li>
+      <li><b>D'Hondt.</b> Reparto en las 52 circunscripciones con umbral del 3 % y los escaños de 2026 (Madrid 38, Cádiz 8).</li>
+    </ol>
+    <p>Como comprobación, el código de reparto reproduce los 350 escaños de 2023 a partir de los porcentajes provinciales.</p>
+
+    <h2>6. Priors</h2>
+    <div class="tw" id="priors"></div>
+
+    <h2>7. Qué ha aprendido el modelo</h2>
+    <h3>Volatilidad: cuánto se mueve cada partido en una quincena</h3>
+    <p id="vol-text"></p>
+    <div id="m-vol" class="chart"></div>
+
+    <h3>Sesgo común de la industria</h3>
+    <p>Cuántos puntos se desviaría una casa media por partido. Es la pieza más delicada: solo se identifica por continuidad con las encuestas posteriores al 23-J y afecta a todo el nivel de la estimación.</p>
+    <div id="m-common" class="chart"></div>
+
+    <div class="two">
+      <div>
+        <h3>Peso de Compromís en el espacio Sumar</h3>
+        <p id="rho-text"></p>
+        <div id="m-rho" class="chart"></div>
+      </div>
+      <div>
+        <h3>Qué partidos se mueven juntos</h3>
+        <p>Correlación de los cambios quincenales en escala logit, estimada sobre el camino latente desde junio de 2024. Indica movimientos conjuntos, no transferencias de votantes.</p>
+        <div id="m-corr" class="chart"></div>
+      </div>
+    </div>
+
+    <h2>8. Convergencia y ajuste</h2>
+    <p id="diag-text"></p>
+    <div class="tiles tiles-row" id="diag"></div>
+    <h3>¿Sirve corregir los sesgos?</h3>
+    <p>Error cuadrático medio de las encuestas frente a lo que predice el modelo, en puntos. Si se tiene en cuenta la casa, el error se reduce de forma clara.</p>
+    <div id="m-fit" class="chart"></div>
+
+    <h2 id="limites">9. Limitaciones</h2>
+    <ul class="lim">
+      <li><b>Sin error del día de la votación.</b> El modelo no incluye un término extra por el fallo conjunto de las encuestas ni la dinámica de campaña. Los intervalos son, por tanto, demasiado estrechos como pronóstico.</li>
+      <li><b>Sesgos constantes desde 2023.</b> El sesgo común \(\mu\) se estima por continuidad con las encuestas posteriores al 23-J y es la mayor fuente de incertidumbre no modelada.</li>
+      <li><b>Perfiles provinciales uniformes</b> para SALF (nacional), Adelante Andalucía y Aliança Catalana (en su territorio).</li>
+      <li><b>Vox en Santa Cruz de Tenerife.</b> No concurrió en 2023, de modo que se imputa un 9,4 % a partir de la ratio de 2019.</li>
+      <li><b>Pesos provinciales aproximados</b> por escaños menos dos, en lugar de por censo real.</li>
+      <li><b>Probabilidades en las colas.</b> Con un número limitado de muestras y simulaciones, valores por debajo del 1 % o por encima del 99 % no se pueden resolver con precisión.</li>
+    </ul>
+
+    <h2>10. Datos y reproducibilidad</h2>
+    <p>Las encuestas proceden de la API abierta de <a href="https://xn--eleccionesespaa-crb.com" rel="noopener">eleccionesEspaña.com</a>. El modelo está escrito en <a href="https://num.pyro.ai" rel="noopener">NumPyro</a> y es una evolución de <a href="https://github.com/aasensio/elecciones2016" rel="noopener">aasensio/elecciones2016</a>. Se ajusta con NUTS y toda esta página se regenera con estas órdenes:</p>
+<pre class="code"><code>python fetch_polls.py && python parse_polls.py
+python fit.py --warmup 800 --samples 600 --chains 2 --depth 10
+python report.py
+python build_site.py</code></pre>
+  </div>
+</section>
+</main>
+
+<footer class="foot"><div class="wrap">
+  <p id="foot-meta"></p>
+  <p>Este sitio agrega encuestas publicadas por terceros y no es un sondeo propio. Sus estimaciones son el resultado de un modelo estadístico, con los supuestos descritos en <a href="#modelo">El modelo</a>.</p>
+</div></footer>
+
+<div id="tip" role="status" hidden></div>
+<script src="data.js?v=2026-11-06"></script>
+<script defer src="vendor/katex/katex.min.js"></script>
+<script defer src="vendor/katex/auto-render.min.js"></script>
+<script defer src="app.js?v=2026-11-06"></script>
+</body>
+</html>
