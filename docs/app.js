@@ -333,7 +333,8 @@ function evolution() {
       fade: sel.has(k) ? 1 : 0,
     };
   });
-  const pollPts = keys.map(k => [k, D.polls.filter(p => p[3][k] != null).map(p => [ms(p[0]), p[3][k]])]);
+  const pollPts = keys.map(k => [k, D.polls.flatMap((p, j) => p[3][k] != null ? [[ms(p[0]), p[3][k], j]] : [])]);
+  let dotHits = [];     // [x, y, índice de encuesta, partido] de los puntos visibles
   const margin = () => ({ l: 34, r: st.W < 560 ? 84 : 104, t: 22, b: 26 });
   const scales = () => {
     const m = margin();
@@ -350,16 +351,18 @@ function evolution() {
     canvas.width = st.W * dpr; canvas.height = st.H * dpr;
     canvas.style.width = st.W + 'px'; canvas.style.height = st.H + 'px';
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    dotHits = [];
     if (!st.showPolls) return;
     const { x, y, m } = scales();
     c.globalAlpha = +css('--dot-a') || .34;
     pollPts.forEach(([k, pts]) => {
       if (!sel.has(k)) return;
       c.fillStyle = css(`--c-${E[k].color}`);
-      pts.forEach(([t, v]) => {
+      pts.forEach(([t, v, j]) => {
         if (t > cut || t < st.x0) return;
         const py = y(v); if (py < m.t) return;
         c.beginPath(); c.arc(x(t), py, st.W < 560 ? 1.4 : 2, 0, 7); c.fill();
+        dotHits.push([x(t), py, j, k]);
       });
     });
   }
@@ -485,9 +488,42 @@ function evolution() {
   };
   playBtn.addEventListener('click', () => playLinear(6000));
 
+  // caja de una encuesta concreta
+  const pollTip = (j, k0) => {
+    const [mid, firm, n, v, media, d0, d1] = D.polls[j];
+    const span = d0 && d1 && d0 !== d1 ? `${dFmt(d0, { day: 'numeric', month: 'short' })} – ${dFmt(d1)}` : dFmt(d1 || mid);
+    const rows = Object.keys(v).filter(k => E[k]).sort((a, b) => v[b] - v[a]).map(k => {
+      const row = tr(E[k].color, E[k].short, `${f1(v[k])} %`);
+      return k === k0 ? row.replace('class="tr"', 'class="tr on"') : row;
+    }).join('');
+    const rescaled = v.Podemos != null && mid >= D.meta.coalition;
+    return `<h5>${esc(firm)}${media && media !== firm ? `<small> · ${esc(media)}</small>` : ''}</h5>` +
+      `<small>Campo: ${span}${n ? ` · ${f0(n)} entrevistas` : ''}</small>` + rows +
+      (rescaled ? `<small>Podemos reescalado a base nacional</small>` : '');
+  };
+  const nearestDot = (px, py) => {
+    let best = null, bd = 49;     // radio de captura: 7 px
+    dotHits.forEach(d => {
+      if (!sel.has(d[3])) return;
+      const dd = (d[0] - px) ** 2 + (d[1] - py) ** 2;
+      if (dd < bd) { bd = dd; best = d; }
+    });
+    return best;
+  };
+
   // cursor
   const onMove = ev => {
     const { x, y, m } = scales(), rect = svg.getBoundingClientRect();
+    const dot = nearestDot(ev.clientX - rect.left, ev.clientY - rect.top);
+    if (dot) {
+      cross.setAttribute('opacity', 0); gCross.textContent = '';
+      const [mid, , , v] = D.polls[dot[2]];
+      keys.forEach(k => {
+        if (!sel.has(k) || v[k] == null) return;
+        svgEl('circle', { cx: x(ms(mid)), cy: y(v[k]), r: k === dot[3] ? 5 : 3.5, fill: col(E[k].color), stroke: 'var(--bg)', 'stroke-width': 1.5 }, gCross);
+      });
+      return showTip(pollTip(dot[2], dot[3]), ev);
+    }
     const t = x.inv(ev.clientX - rect.left);
     let i = 0, best = Infinity;
     tms.forEach((v, j) => { if (Math.abs(v - t) < best) { best = Math.abs(v - t); i = j; } });
