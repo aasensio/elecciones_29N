@@ -756,6 +756,147 @@ function provinces() {
   draw();
 }
 
+/* ---------- últimos escaños ---------- */
+function lastSeats() {
+  const L = D.last, M = S.meta, E = L.edgePP;
+  const pts = x => `${f1(x)} pt`;
+  const name = k => M[k] ? M[k].short : k;
+  $('#last-lede').innerHTML = `Con el voto que estima hoy el modelo, <b>${f0(L.nEdge)} escaños</b> (entre ${L.nEdgeQ[0]} y ${L.nEdgeQ[1]} en el 90 % de las simulaciones) se deciden por menos de ${f0(E)} punto de voto en su provincia.`;
+  $('#edge-sub').textContent = `Número medio de provincias en que cada candidatura se lleva el último escaño con menos de ${f0(E)} punto de ventaja (a la izquierda) o se queda a menos de ${f0(E)} punto de lograrlo (a la derecha).`;
+
+  /* --- escaños en el filo: barras divergentes por candidatura --- */
+  const eroot = $('#edge'), ER = L.edge.filter(r => r.hold + r.miss >= .1);
+  const ew = h('div', 'rows', null, eroot);
+  const ehead = h('div', 'row erow head', `<span></span><span class="eh-l">Lo gana por poco</span><span class="eh-r">Lo pierde por poco</span>`, ew);
+  const eitems = ER.map(r => {
+    const row = h('div', 'row erow', null, ew);
+    h('div', 'rname', `<i class="sw" style="background:${col(M[r.key].color)}"></i>${name(r.key)}`, row);
+    const slot = h('div', 'rsvg', null, row);
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => { psel.value = psel.value === r.key ? '' : r.key; draw(); });
+    bindTip(row, `<h5>${M[r.key].name}</h5>` +
+      tr(M[r.key].color, 'Último escaño por < ' + f0(E) + ' pt', f1(r.hold), `${r.holdQ[0]}–${r.holdQ[1]}`) +
+      tr(M[r.key].color, 'A las puertas por < ' + f0(E) + ' pt', f1(r.miss), `${r.missQ[0]}–${r.missQ[1]}`) +
+      `<small>Media de provincias e intervalo del 90 %. Clic para filtrar las provincias.</small>`);
+    return { r, slot };
+  });
+  const emax = Math.max(...ER.map(r => Math.max(r.hold, r.miss)), 1);
+  let eshown = false;
+  const edraw = responsive(eroot, () => {
+    eitems.forEach(({ r, slot }, i) => {
+      slot.innerHTML = '';
+      const w = slot.clientWidth, H = 30, c = w / 2, x = lin(0, emax * 1.18, 0, c - 4);
+      const s = svgEl('svg', { width: w, height: H }, slot);
+      svgEl('line', { class: 'axis-l', x1: c, x2: c, y1: 2, y2: H - 2 }, s);
+      const dl = `${i * 35}ms`, tr_ = 'transform .7s cubic-bezier(.3,.9,.3,1) ' + dl;
+      const a = svgEl('rect', { x: c - 1 - x(r.hold), y: 8, width: x(r.hold), height: 14, rx: 3, fill: col(M[r.key].color), style: `transform-box:fill-box;transform-origin:right;transform:scaleX(${eshown ? 1 : 0});transition:${tr_}` }, s);
+      const b = svgEl('rect', { x: c + 1, y: 8, width: x(r.miss), height: 14, rx: 3, fill: col(M[r.key].color), 'fill-opacity': .32, stroke: col(M[r.key].color), 'stroke-width': 1.2, style: `transform-box:fill-box;transform-origin:left;transform:scaleX(${eshown ? 1 : 0});transition:${tr_}` }, s);
+      const tl = svgEl('text', { x: c - 6 - x(r.hold), y: 19, 'text-anchor': 'end', class: 'ink' }, s); tl.textContent = f1(r.hold);
+      const tr2 = svgEl('text', { x: c + 6 + x(r.miss), y: 19, class: 'ink' }, s); tr2.textContent = f1(r.miss);
+      slot._go = () => { a.style.transform = b.style.transform = 'scaleX(1)'; };
+    });
+  });
+  edraw();
+  onVisible(eroot, () => { eshown = true; eitems.forEach(({ slot }) => slot._go()); }, .1);
+
+  /* --- provincias --- */
+  const root = $('#last'), P = L.provinces;
+  const psel = $('#last-party'), csel = $('#last-ccaa');
+  const parties = [...new Set(P.flatMap(p => [...p.win, ...p.run].filter(x => x[1] >= .05).map(x => x[0])))]
+    .sort((a, b) => S.hemiOrder.indexOf(a) - S.hemiOrder.indexOf(b));
+  psel.innerHTML = '<option value="">Todas</option>' + parties.map(k => `<option value="${esc(k)}">${esc(M[k].name)}</option>`).join('');
+  const ccaa = [...new Set(P.map(p => p.ccaa))].sort((a, b) => a.localeCompare(b, 'es'));
+  csel.innerHTML = '<option value="">Todas</option>' + ccaa.map(c => `<option>${esc(c)}</option>`).join('');
+  const XM = 8;                                     // eje del voto que falta, en puntos
+  const share = (arr, k) => (arr.find(x => x[0] === k) || [0, 0])[1];
+  let sort = 'close';
+  const wrap = h('div', 'rows', null, root);
+  let items = [], head, showAll = false;
+  const TOP = 15;
+  const more = h('button', 'btn ghost sm more', '', root);
+  more.addEventListener('click', () => {
+    showAll = !showAll; draw();
+    if (!showAll) root.scrollIntoView({ block: 'start' });
+  });
+
+  function stack(svg, arr, y, hh, w, op, focus) {
+    let x0 = 0;
+    const other = 1 - arr.reduce((a, x) => a + x[1], 0);
+    [...arr, ['_', other]].forEach(([k, p]) => {
+      if (p <= 0) return;
+      const ww = p * w;
+      svgEl('rect', { x: x0 + .5, y, width: Math.max(ww - 1, .5), height: hh, rx: 2,
+        fill: k === '_' ? 'var(--axis)' : col(M[k].color),
+        opacity: focus && k !== focus ? .18 : op }, svg);
+      x0 += ww;
+    });
+  }
+  function draw() {
+    const f = psel.value;
+    let list = P.filter(p => (!csel.value || p.ccaa === csel.value) &&
+      (!f || share(p.win, f) + share(p.run, f) >= .1));
+    if (sort === 'seats') list = [...list].sort((a, b) => b.seats - a.seats || a.need[2] - b.need[2]);
+    if (sort === 'az') list = [...list].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    const total = list.length, cut = !showAll && total > TOP;
+    if (cut) list = list.slice(0, TOP);
+    more.hidden = total <= TOP;
+    more.textContent = cut ? `Ver las ${total} provincias` : 'Ver menos';
+    eitems.forEach(({ r, slot }) => slot.parentNode.classList.toggle('dim', !!f && r.key !== f));
+    wrap.innerHTML = '';
+    head = h('div', 'row lrow head', `<span>Provincia</span><span>Último escaño · a las puertas</span><span class="axis-slot"></span><span class="rval" style="font-weight:400;font-size:12px;color:var(--muted)">Falta</span>`, wrap);
+    if (!list.length) h('p', 'note', 'Ninguna provincia con esta combinación.', wrap);
+    items = list.map(p => {
+      const row = h('div', 'row lrow', null, wrap);
+      h('div', 'rname', `<span class="pn">${esc(p.name)}<small>${p.seats} esc.</small></span>`, row);
+      const bars = h('div', 'rsvg', null, row), box = h('div', 'rsvg', null, row);
+      h('div', 'rval', `${pts(p.need[2])}<small>${prob(p.pEdge)} &lt; ${f0(E)} pt</small>`, row);
+      bindTip(row, () => `<h5>${esc(p.name)} <small>${esc(p.ccaa)} · ${p.seats} escaños</small></h5>` +
+        `<small>Se lleva el último escaño</small>` +
+        p.win.slice(0, 5).map(([k, q]) => tr(M[k].color, M[k].short, prob(q))).join('') +
+        `<small>Se queda a las puertas</small>` +
+        p.run.slice(0, 5).map(([k, q]) => tr(M[k].color, M[k].short, prob(q))).join('') +
+        `<small>Duelos más frecuentes: ${p.duels.map(([a, b, q]) => `${name(a)} sobre ${name(b)} (${prob(q)})`).join(', ')}</small><br>` +
+        `<small>Voto que falta al aspirante: ${pts(p.need[2])} (${f1(p.need[0])}–${f1(p.need[4])} al 90 %)</small>`);
+      return { p, bars, box };
+    });
+    paint();
+  }
+  const paint = responsive(root, () => {
+    if (!head) return;
+    const f = psel.value;
+    const axisSlot = head.querySelector('.axis-slot');
+    const w = axisSlot.clientWidth, x = lin(0, XM, 4, w - 8);
+    axisSlot.innerHTML = '';
+    const ax = svgEl('svg', { width: w, height: 22 }, axisSlot);
+    const tk = ticks(0, XM, w < 220 ? 2 : 4);
+    tk.forEach(t => { svgEl('text', { x: x(t), y: 15, 'text-anchor': 'middle' }, ax).textContent = t + (t === tk[tk.length - 1] ? ' pt' : ''); });
+    items.forEach(({ p, bars, box }) => {
+      bars.innerHTML = ''; box.innerHTML = '';
+      const bw = bars.clientWidth, H = 36;
+      const sb = svgEl('svg', { width: bw, height: H }, bars);
+      stack(sb, p.win, 7, 13, bw, 1, f);
+      stack(sb, p.run, 23, 6, bw, .55, f);
+      const s = svgEl('svg', { width: w, height: H }, box);
+      svgEl('rect', { x: x(0), y: 4, width: x(E) - x(0), height: H - 8, fill: 'var(--wash)' }, s);
+      tk.forEach(t => svgEl('line', { class: 'grid-l', x1: x(t), x2: x(t), y1: 0, y2: H }, s));
+      const cx = v => x(Math.min(v, XM)), [q5, q25, q50, q75, q95] = p.need;
+      svgEl('line', { x1: cx(q5), x2: cx(q95), y1: H / 2, y2: H / 2, stroke: 'var(--ink2)', 'stroke-width': 1.2 }, s);
+      svgEl('rect', { x: cx(q25), y: H / 2 - 6, width: Math.max(cx(q75) - cx(q25), 2), height: 12, rx: 3, fill: 'var(--surface)', stroke: 'var(--ink2)', 'stroke-width': 1.2 }, s);
+      svgEl('line', { x1: cx(q50), x2: cx(q50), y1: H / 2 - 6, y2: H / 2 + 6, stroke: 'var(--ink)', 'stroke-width': 2.2 }, s);
+      if (q95 > XM) svgEl('path', { d: `M${x(XM) - 1},${H / 2 - 4}l5,4l-5,4`, fill: 'none', stroke: 'var(--ink2)', 'stroke-width': 1.3 }, s);
+    });
+  });
+  $('#last-sort').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    [...e.currentTarget.children].forEach(c => c.classList.toggle('on', c === b));
+    sort = b.dataset.s; draw();
+  });
+  psel.addEventListener('change', draw);
+  csel.addEventListener('change', draw);
+  draw();
+  $('#last-note').textContent = `El voto que falta se mide en puntos del voto válido de la provincia y supone que el aspirante lo gana sin que el ganador lo pierda; si se trasvasa directamente entre ambos basta con algo menos. Las listas por debajo del 3 % no pueden aspirar al escaño. Como el reparto provincial, depende de perfiles de voto supuestos a partir de 2023, y en las provincias pequeñas el último escaño exige más voto porque cada escaño vale más.`;
+}
+
 /* ---------- casas ---------- */
 function houses() {
   const root = $('#houses'), Hs = D.houses, rowH = 27;
@@ -963,7 +1104,7 @@ function fitChart() {
 }
 
 /* ================= arranque ================= */
-hero(); hemicycle(); voteChart(); evolution(); smalls(); seatsChart(); pactometer(); provinces(); houses();
+hero(); hemicycle(); voteChart(); evolution(); smalls(); seatsChart(); pactometer(); provinces(); lastSeats(); houses();
 const initial = location.hash === '#modelo' ? 1 : 0;
 placeInd();
 if (initial) select(1);

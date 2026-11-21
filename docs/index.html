@@ -9,7 +9,7 @@
 <meta property="og:description" content="Estimación de voto y escaños con un modelo bayesiano que corrige los sesgos de cada casa encuestadora.">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 26a13 13 0 0 1 26 0' fill='none' stroke='%231f63c4' stroke-width='5'/%3E%3Cpath d='M10 26a6 6 0 0 1 12 0' fill='none' stroke='%23c8202e' stroke-width='5'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=2026-11-17">
+<link rel="stylesheet" href="style.css?v=2026-11-21">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 <script>try{var t=localStorage.getItem('tema');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
@@ -143,6 +143,30 @@
 
   <article class="wrap block">
     <header class="bh"><span class="num">06</span><div>
+      <h2>Los últimos escaños</h2>
+      <p>En cada provincia, el último escaño es el que D'Hondt asigna con el cociente más bajo. El aspirante es la candidatura que menos voto necesita para arrebatárselo. Son los escaños que un pequeño cambio puede mover.</p>
+    </div></header>
+    <p class="lede-s" id="last-lede"></p>
+    <h3 class="sub">Escaños en el filo, por candidatura</h3>
+    <p class="subp" id="edge-sub"></p>
+    <div id="edge" class="chart"></div>
+    <h3 class="sub">Provincia a provincia</h3>
+    <p class="subp">La barra gruesa reparte las simulaciones según quién se lleva el último escaño; la fina, según quién se queda a las puertas. A la derecha, el voto adicional que necesita el aspirante: la caja va del percentil 25 al 75 y la línea del 5 al 95.</p>
+    <div class="controls">
+      <div class="seg" id="last-sort" role="group" aria-label="Orden">
+        <button data-s="close" class="on">Más ajustadas</button><button data-s="seats">Más escaños</button><button data-s="az">A–Z</button>
+      </div>
+      <div class="ctl-right">
+        <label class="select">Candidatura <select id="last-party"></select></label>
+        <label class="select">Comunidad <select id="last-ccaa"></select></label>
+      </div>
+    </div>
+    <div id="last" class="chart"></div>
+    <p class="note" id="last-note"></p>
+  </article>
+
+  <article class="wrap block">
+    <header class="bh"><span class="num">07</span><div>
       <h2>Sesgos de las casas encuestadoras</h2>
       <p>Cuántos puntos se desvía cada casa de la estimación del modelo, a igualdad de fecha. A la derecha del cero, la casa da más voto del estimado.</p>
     </div></header>
@@ -272,9 +296,9 @@ python build_site.py</code></pre>
 </div></footer>
 
 <div id="tip" role="status" hidden></div>
-<script src="data.js?v=2026-11-17"></script>
+<script src="data.js?v=2026-11-21"></script>
 <script defer src="vendor/katex/katex.min.js"></script>
 <script defer src="vendor/katex/auto-render.min.js"></script>
-<script defer src="app.js?v=2026-11-17"></script>
+<script defer src="app.js?v=2026-11-21"></script>
 </body>
 </html>
